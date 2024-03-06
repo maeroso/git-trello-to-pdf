@@ -15,10 +15,10 @@ async def login_to_trello(context, username, password):
     print(f"Logged on Trello in as {username}")
 
 
-async def wait_for_no_changes(page):
+async def wait_for_no_changes(page, sleep_time):
     while True:
         html = await page.content()
-        await asyncio.sleep(2)
+        await asyncio.sleep(sleep_time)
         new_html = await page.content()
         if html == new_html:
             break
@@ -35,12 +35,12 @@ async def expand_all_details(page):
         pass
 
 
-async def print_card_to_pdf(semaphore, context, card, output_dir):
+async def print_card_to_pdf(semaphore, context, card, output_dir, sleep_time):
     async with semaphore:
         page = await context.new_page()
         await page.goto(f"https://trello.com/c/{card}")
         try:
-            await wait_for_no_changes(page)
+            await wait_for_no_changes(page, sleep_time)
             page_has_error = await has_error(page, card)
             if page_has_error:
                 return
@@ -86,6 +86,7 @@ async def main():
         default=5,
         help="Number of tasks to run simultaneously",
     )
+    parser.add_argument("-s", "--page-sleep-time", type=int, default=2, help="Time to wait for page to load in seconds")
     args = parser.parse_args()
 
     cards = []
@@ -114,7 +115,7 @@ async def main():
         await login_to_trello(context, username, password)
         tasks = [
             asyncio.create_task(
-                print_card_to_pdf(semaphore, context, card, args.output)
+                print_card_to_pdf(semaphore, context, card, args.output, args.page_sleep_time)
             )
             for card in cards
         ]
