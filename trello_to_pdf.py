@@ -1,7 +1,7 @@
 import argparse
 import asyncio
-import os
 from playwright.async_api import async_playwright, expect
+
 
 async def login_to_trello(context, username, password):
     page = await context.new_page()
@@ -14,43 +14,78 @@ async def login_to_trello(context, username, password):
     await expect(page.get_by_test_id("header-member-menu-avatar")).to_be_visible()
     print(f"Logged on Trello in as {username}")
 
+
+async def wait_for_no_changes(page):
+    while True:
+        html = await page.content()
+        await asyncio.sleep(2)
+        new_html = await page.content()
+        if html == new_html:
+            break
+
+
+async def expand_all_details(page):
+    try:
+        await page.click("text=Show more")
+    except:
+        pass
+    try:
+        await page.click("text=Show details")
+    except:
+        pass
+
+
 async def print_card_to_pdf(semaphore, context, card, output_dir):
     async with semaphore:
         page = await context.new_page()
         await page.goto(f"https://trello.com/c/{card}")
         try:
-            await expect(page.locator(".card-detail-window")).to_be_visible()
-            # await expect(page.get_by_text("Description")).to_be_visible()
-            try:
-                await page.click("text=Show more")
-            except:
-                pass
-            try:
-                await expect(page.locator(".attachment-thumbnail")).to_be_visible()
-            except:
-                pass
-            await page.wait_for_load_state("networkidle")
+            await wait_for_no_changes(page)
+            page_has_error = await has_error(page, card)
+            if page_has_error:
+                return
+            await expand_all_details(page)
             await page.pdf(path=f"{output_dir}/{card}.pdf")
             print(f"Card {card} saved to {output_dir}/{card}.pdf")
-        except:
-            await check_error(page, card)
+        except Exception as e:
+            print(f"Error processing card {card}: {e}")
         finally:
             await page.close()
-    
 
-async def check_error(page, card):
+
+async def has_error(page, card) -> bool:
     try:
-        expect(await page.get_by_text("Board not found")).to_be_visible()
+        await expect(page.get_by_text("Board not found")).to_be_visible()
         print(f"Card {card} or board not found")
+        return True
     except:
-        print(f"Card {card} requires access")
+        try:
+            await expect(page.get_by_text("This board is private")).to_be_visible()
+            print(f"Card {card} is private")
+            return True
+        except:
+            pass
+    return False
+
 
 async def main():
     parser = argparse.ArgumentParser(description="Convert Trello cards to PDF")
-    parser.add_argument("-i", "--file", type=argparse.FileType("r"), help="File containing card hashes")
-    parser.add_argument("-o", "--output", default="output/trello_cards", help="Output directory")
+    parser.add_argument(
+        "-i", "--file", type=argparse.FileType("r"), help="File containing card hashes"
+    )
+    parser.add_argument(
+        "-o", "--output", default="output/trello_cards", help="Output directory"
+    )
     parser.add_argument("-u", "--username", help="Trello username")
     parser.add_argument("-p", "--password", help="Trello password")
+    parser.add_argument("-b", "--headful", action="store_true", help="Run headful mode")
+    parser.add_argument(
+        "-t",
+        "--tasks",
+        type=int,
+        default=5,
+        help="Number of tasks to run simultaneously",
+    )
     args = parser.parse_args()
 
     cards = []
@@ -67,17 +102,26 @@ async def main():
 
     username = args.username
     password = args.password
+    headless = not args.headful
+    slow_mo = 50 if args.headful else None
+    tasks_number = int(args.tasks)
 
-    semaphore = asyncio.Semaphore(5)
+    semaphore = asyncio.Semaphore(tasks_number)
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, slow_mo=50)
+        browser = await p.chromium.launch(headless=headless, slow_mo=slow_mo)
         context = await browser.new_context()
         await login_to_trello(context, username, password)
-        tasks = [asyncio.create_task(print_card_to_pdf(semaphore, context, card, args.output)) for card in cards]
+        tasks = [
+            asyncio.create_task(
+                print_card_to_pdf(semaphore, context, card, args.output)
+            )
+            for card in cards
+        ]
         _ = await asyncio.wait(tasks)
         await context.close()
         await browser.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -124,6 +124,7 @@ run_trello_to_pdf() {
     python -u trello_to_pdf.py -i "$1/trello_card_hashes.txt" -o "$1/trello_cards" -u $2 -p $3 | tee "$1/trello_to_pdf.log"
     grep -E "Card (.*) not found" "$1/trello_to_pdf.log" > "$1/errors/trello_card_not_found.txt"
     grep -E "Card (.*) requires access" "$1/trello_to_pdf.log" > "$1/errors/trello_card_requires_access.txt"
+    grep -E "Error processing card (.*)" "$1/trello_to_pdf.log" > "$1/errors/trello_card_processing_error.txt"
     echo "Trello card details have been saved to $1/trello_cards"
 }
 

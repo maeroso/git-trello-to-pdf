@@ -2,10 +2,17 @@
 
 This script extracts Trello card hashes from git commit messages and generates PDFs of the corresponding Trello cards.
 
+## Supported OS
+
+- macOS
+- Linux
+- BSDs
+
 ## Prerequisites
 
+- bash
 - Python 3
-- Playwright (`pip install playwright`)
+- git
 - pcre2grep
 
 ## Usage
@@ -20,7 +27,7 @@ This script extracts Trello card hashes from git commit messages and generates P
 2. Run the script with the required options:
 
     ```bash
-    ./git-trello-to-pdf.sh -e EMAIL -p PASSWORD -r REPO_DIR -o OUTPUT_DIR
+    sh git-trello-to-pdf.sh -e EMAIL -p PASSWORD -r REPO_DIR -o OUTPUT_DIR
     ```
 
     - `-e EMAIL`: Your Trello email
