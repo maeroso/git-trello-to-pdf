@@ -34,6 +34,14 @@ async def expand_all_details(page):
     except:
         pass
 
+async def save_card_description_to_md(page, output_dir, card):
+    await page.click(".js-edit-desc")
+    await page.click('[data-testid="MarkdownIcon"]')
+    
+    card_description = await page.query_selector('.card-description')
+    description_markdown = await card_description.input_value()
+    with open(f"{output_dir}/{card}.md", "w") as md_file:
+        md_file.write(description_markdown)
 
 async def print_card_to_pdf(semaphore, context, card, output_dir, sleep_time):
     async with semaphore:
@@ -46,6 +54,7 @@ async def print_card_to_pdf(semaphore, context, card, output_dir, sleep_time):
                 return
             await expand_all_details(page)
             await page.pdf(path=f"{output_dir}/{card}.pdf")
+            await save_card_description_to_md(page, output_dir, card)
             print(f"Card {card} saved to {output_dir}/{card}.pdf")
         except Exception as e:
             print(f"Error processing card {card}: {e}")
