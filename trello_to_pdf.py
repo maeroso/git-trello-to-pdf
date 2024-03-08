@@ -11,7 +11,7 @@ async def login_to_trello(context, username, password):
     await page.wait_for_load_state()
     await page.fill('input[name="password"]', password)
     await page.click("#login-submit")
-    await expect(page.get_by_test_id("header-member-menu-avatar")).to_be_visible()
+    await expect(page.get_by_test_id("header-member-menu-avatar")).to_be_visible(timeout=20000)
     print(f"Logged on Trello in as {username}")
 
 
@@ -26,13 +26,25 @@ async def wait_for_no_changes(page, sleep_time):
 
 async def expand_all_details(page):
     try:
-        await page.click("text=Show more")
+        await page.click("text=Show more", timeout=1000)
     except:
         pass
     try:
-        await page.click("text=Show details")
+        await page.click("text=Show details", timeout=1000)
     except:
         pass
+
+async def download_attachments(page, output_dir, card):
+    attachment_divs = await page.query_selector_all('.attachment-thumbnail')
+    for attachment_div in attachment_divs:
+        attachment_link = await attachment_div.query_selector('.js-download')
+        attachment_name = await(await attachment_div.query_selector('.attachment-thumbnail-name')).inner_text()
+        async with page.expect_download() as download_info:
+            await attachment_link.click()
+        download = await download_info.value
+        
+        # Wait for the download process to complete and save the downloaded file somewhere
+        await download.save_as(output_dir + "/" + card + "_att_" + download.suggested_filename)
 
 async def extract_checklists(page):
     checklists = await page.query_selector_all(".checklist")
@@ -71,6 +83,7 @@ async def print_card_to_pdf(semaphore, context, card, output_dir, sleep_time):
             await expand_all_details(page)
             await page.pdf(path=f"{output_dir}/{card}.pdf")
             await save_card_description_to_md(page, output_dir, card)
+            await download_attachments(page, output_dir, card)
             print(f"Card {card} saved to {output_dir}/{card}.pdf")
         except Exception as e:
             print(f"Error processing card {card}: {e}")
