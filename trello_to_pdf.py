@@ -1,6 +1,8 @@
 import argparse
 import asyncio
 import os
+import re
+
 from playwright.async_api import async_playwright, expect
 
 
@@ -43,11 +45,17 @@ async def download_attachments(page, output_dir, card):
     attachment_divs = await page.query_selector_all('.attachment-thumbnail')
     for attachment_div in attachment_divs:
         attachment_link = await attachment_div.query_selector('.js-download')
+        
+        href = await attachment_link.get_attribute('href')
+        # If href does not point to a file, skip to the next attachment
+        if not re.search(r'\.[a-zA-Z0-9]+$', href):
+            print(f"Skipping {href} attachment, does not point directly to a file.")
+            continue  # Skip this iteration and move to the next attachment
+        
         attachment_name = await(await attachment_div.query_selector('.attachment-thumbnail-name')).inner_text()
         async with page.expect_download() as download_info:
             await attachment_link.click()
         download = await download_info.value
-        
         # Wait for the download process to complete and save the downloaded file somewhere
         await download.save_as(output_dir + "/" + card + "_att_" + download.suggested_filename)
 
@@ -76,10 +84,19 @@ async def save_card_description_to_md(page, output_dir, card):
     with open(f"{output_dir}/{card}.md", "w") as md_file:
         md_file.write(description_markdown + "\n" + checklist_markdown)
 
+def scrub_filename(filename):
+    # Replace characters not suitable for filenames with an underscore
+    cleaned_filename = re.sub(r'[<>:"/\\|?*$]', '_', filename)
+    # Remove leading and trailing whitespaces
+    cleaned_filename = cleaned_filename.strip()
+    # Limit filename length to 32 characters (common limit for many file systems)
+    cleaned_filename = cleaned_filename[:32]
+    return cleaned_filename
+
 async def extract_card_board_list_names(page):
     # Extract the first 32 characters of the card name
     card_name_element = await page.query_selector('.window-title > h2')
-    card_name = (await card_name_element.text_content())[:32] if card_name_element else "Card name not found"
+    card_name = (await card_name_element.text_content()) if card_name_element else "Card name not found"
     
     # Extract the list name
     list_name_element = await page.query_selector('.js-current-list > p > a')
@@ -89,7 +106,7 @@ async def extract_card_board_list_names(page):
     board_name_element = await page.query_selector('a[data-testid="workspace-detail-name"] > p')
     board_name = await board_name_element.text_content() if board_name_element else "Board name not found"
     
-    return card_name.strip(), board_name, list_name
+    return scrub_filename(card_name), scrub_filename(board_name), scrub_filename(list_name)
 
 async def print_card_to_pdf(semaphore, context, card, output_dir, sleep_time):
     async with semaphore:
@@ -131,14 +148,7 @@ async def has_error(page, card) -> bool:
     return False
 
 def collect_trello_card_hashes(directory):
-    card_hashes = set()  # Use a set to avoid duplicates
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            parts = file.split("_")
-            if parts:  # Check if the filename actually contains an underscore
-                card_hash = parts[0]
-                card_hashes.add(card_hash)
-    return card_hashes
+    return {file.split("$")[0] for root, dirs, files in os.walk(directory) for file in files if file.split("_")}
 
 async def main():
     parser = argparse.ArgumentParser(description="Convert Trello cards to PDF")
