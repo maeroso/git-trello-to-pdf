@@ -34,14 +34,30 @@ async def expand_all_details(page):
     except:
         pass
 
+async def extract_checklists(page):
+    checklists = await page.query_selector_all(".checklist")
+    checklist_data = ""
+    for checklist in checklists:
+        title = await (await checklist.query_selector(".checklist-title h3")).text_content()
+
+        items = await checklist.query_selector_all(".checklist-item")
+        for item in items:
+            is_checked = await (await item.query_selector(".checklist-item-checkbox input")).is_checked()
+            item_text = await (await item.query_selector(".checklist-item-details-text")).text_content()
+            checklist_data += f"- [{'x' if is_checked else ' '}] {item_text}\n"
+        checklist_data += "\n"
+
+    return checklist_data
+
 async def save_card_description_to_md(page, output_dir, card):
     await page.click(".js-edit-desc")
     await page.click('[data-testid="MarkdownIcon"]')
     
     card_description = await page.query_selector('.card-description')
     description_markdown = await card_description.input_value()
+    checklist_markdown =  await extract_checklists(page)
     with open(f"{output_dir}/{card}.md", "w") as md_file:
-        md_file.write(description_markdown)
+        md_file.write(description_markdown + "\n" + checklist_markdown)
 
 async def print_card_to_pdf(semaphore, context, card, output_dir, sleep_time):
     async with semaphore:
