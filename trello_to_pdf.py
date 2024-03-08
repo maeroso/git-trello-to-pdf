@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import os
 from playwright.async_api import async_playwright, expect
 
 
@@ -129,6 +130,15 @@ async def has_error(page, card) -> bool:
             pass
     return False
 
+def collect_trello_card_hashes(directory):
+    card_hashes = set()  # Use a set to avoid duplicates
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            parts = file.split("_")
+            if parts:  # Check if the filename actually contains an underscore
+                card_hash = parts[0]
+                card_hashes.add(card_hash)
+    return card_hashes
 
 async def main():
     parser = argparse.ArgumentParser(description="Convert Trello cards to PDF")
@@ -152,9 +162,12 @@ async def main():
     args = parser.parse_args()
 
     cards = []
+    existing_card_hashes = collect_trello_card_hashes(args.output)
 
     if args.file:
         card_hashes = [line.strip() for line in args.file]
+        # Filter out cards that have already been processed
+        card_hashes = [hash for hash in card_hashes if hash not in existing_card_hashes]
         cards.extend(card_hashes)
 
     if not cards:
