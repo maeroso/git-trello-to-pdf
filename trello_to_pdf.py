@@ -71,6 +71,21 @@ async def save_card_description_to_md(page, output_dir, card):
     with open(f"{output_dir}/{card}.md", "w") as md_file:
         md_file.write(description_markdown + "\n" + checklist_markdown)
 
+async def extract_card_board_list_names(page):
+    # Extract the first 32 characters of the card name
+    card_name_element = await page.query_selector('.window-title > h2')
+    card_name = (await card_name_element.text_content())[:32] if card_name_element else "Card name not found"
+    
+    # Extract the list name
+    list_name_element = await page.query_selector('.js-current-list > p > a')
+    list_name = await list_name_element.text_content() if list_name_element else "List name not found"
+    
+    # Extract the board name
+    board_name_element = await page.query_selector('a[data-testid="workspace-detail-name"] > p')
+    board_name = await board_name_element.text_content() if board_name_element else "Board name not found"
+    
+    return card_name.strip(), board_name, list_name
+
 async def print_card_to_pdf(semaphore, context, card, output_dir, sleep_time):
     async with semaphore:
         page = await context.new_page()
@@ -81,10 +96,15 @@ async def print_card_to_pdf(semaphore, context, card, output_dir, sleep_time):
             if page_has_error:
                 return
             await expand_all_details(page)
-            await page.pdf(path=f"{output_dir}/{card}.pdf")
-            await save_card_description_to_md(page, output_dir, card)
-            await download_attachments(page, output_dir, card)
-            print(f"Card {card} saved to {output_dir}/{card}.pdf")
+            
+            card_name, board_name, list_name = await extract_card_board_list_names(page)
+            card_output_dir = f"{output_dir}/{board_name}/{list_name}"
+            print(card_output_dir)
+            
+            await page.pdf(path=f"{card_output_dir}/{card}${card_name}.pdf")
+            await save_card_description_to_md(page, card_output_dir, card)
+            await download_attachments(page, card_output_dir, card)
+            print(f"Card {card} saved to {card_output_dir}/{card}")
         except Exception as e:
             print(f"Error processing card {card}: {e}")
         finally:
