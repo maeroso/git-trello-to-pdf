@@ -33,6 +33,10 @@ async def expand_all_details(page):
         await page.click("text=Show details", timeout=1000)
     except:
         pass
+    try:
+        await page.click("text=Show all actions…", timeout=1000)
+    except:
+        pass
 
 async def download_attachments(page, output_dir, card):
     attachment_divs = await page.query_selector_all('.attachment-thumbnail')
