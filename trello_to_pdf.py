@@ -148,7 +148,7 @@ async def has_error(page, card) -> bool:
     return False
 
 def collect_trello_card_hashes(directory):
-    return {file.split("$")[0] for root, dirs, files in os.walk(directory) for file in files if file.split("_")}
+    return {file.split("]")[0][1:] for root, dirs, files in os.walk(directory) for file in files if file.split("_")}
 
 async def main():
     parser = argparse.ArgumentParser(description="Convert Trello cards to PDF")
