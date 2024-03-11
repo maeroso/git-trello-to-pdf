@@ -57,7 +57,7 @@ async def download_attachments(page, output_dir, card):
             await attachment_link.click()
         download = await download_info.value
         # Wait for the download process to complete and save the downloaded file somewhere
-        await download.save_as(output_dir + "/" + card + "_att_" + download.suggested_filename)
+        await download.save_as(output_dir + "/[" + card + "]_att_" + download.suggested_filename)
 
 async def extract_checklists(page):
     checklists = await page.query_selector_all(".checklist")
@@ -81,7 +81,7 @@ async def save_card_description_to_md(page, output_dir, card):
     card_description = await page.query_selector('.card-description')
     description_markdown = await card_description.input_value()
     checklist_markdown =  await extract_checklists(page)
-    with open(f"{output_dir}/{card}.md", "w") as md_file:
+    with open(f"{output_dir}/[{card}].md", "w") as md_file:
         md_file.write(description_markdown + "\n" + checklist_markdown)
 
 def scrub_filename(filename):
@@ -123,7 +123,7 @@ async def print_card_to_pdf(semaphore, context, card, output_dir, sleep_time):
             card_output_dir = f"{output_dir}/{board_name}/{list_name}"
             print(card_output_dir)
             
-            await page.pdf(path=f"{card_output_dir}/{card}${card_name}.pdf")
+            await page.pdf(path=f"{card_output_dir}/[{card}] {card_name}.pdf")
             await save_card_description_to_md(page, card_output_dir, card)
             await download_attachments(page, card_output_dir, card)
             print(f"Card {card} saved to {card_output_dir}/{card}")
