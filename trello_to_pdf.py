@@ -103,7 +103,7 @@ async def extract_card_board_list_names(page):
     list_name = await list_name_element.text_content() if list_name_element else "List name not found"
     
     # Extract the board name
-    board_name_element = await page.query_selector(':is(a[data-testid="workspace-detail-name"] > p, [data-testid="current-workspace-expanded"] p)')
+    board_name_element = await page.query_selector('[data-testid="board-name-display"]')
     board_name = await board_name_element.text_content() if board_name_element else "Board name not found"
     
     return scrub_filename(card_name), scrub_filename(board_name), scrub_filename(list_name)
